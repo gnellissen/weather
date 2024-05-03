@@ -1,0 +1,119 @@
+```{r, include = F}
+library(ggplot2)
+# Load in climate data
+source("weatherman_function.R")
+
+weather_df <- weather_data()
+```
+
+```{r}
+maanden <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+year_info <- c()
+
+for (maand in 1:12){
+weather_df %>% 
+  group_by(year) %>%
+  filter(month == maand) %>% 
+  filter(year >= 1940  & year <= 1963) %>% #Remove current and incomplete year
+  summarise(gemiddelde_temperatuur = mean(TG), group = 2) -> df_1
+  
+weather_df %>% 
+  group_by(year) %>%
+  filter(month == maand) %>% 
+  filter(year >= 2000 & year <= 2023) %>% #Remove current and incomplete year
+  summarise(gemiddelde_temperatuur = mean(TG), group = 1) -> df_2
+
+total <- rbind(df_2,df_1)
+
+total %>% 
+  group_by(group) %>% 
+  summarise(average_temp = mean(gemiddelde_temperatuur), month = maand) -> info
+
+year_info <- rbind(year_info, info)
+
+model <- aov(gemiddelde_temperatuur ~ group, data = total)
+print(maand)
+summary <- summary(model)
+print(summary)
+boxplot(gemiddelde_temperatuur/10 ~ group, 
+        data = total, 
+        main = paste0(maanden[maand], " difference: ", round((info[1,2]-info[2,2])/10,digits = 2), " \u00B0 C", "      p_val : ", round(summary[[1]]$`Pr(>F)`[1], digits = 5)),
+        ylab = "Average Temperature \u00B0C",
+        names = c("1940-1963","2000-2023"))
+}
+
+ggplot(data = year_info) +
+  geom_bar(aes(x = as.factor(month), y = average_temp/10, fill = as.factor(group)), stat = "identity", position = "identity") +
+  scale_fill_manual(values = c("2" = "darkgreen", "1" = "black"), labels = c("2" = "1940-1963", "1" = "2000-2023")) +
+  scale_x_discrete(labels = maanden) +
+  labs(title = "Median of average temperature per month",
+       x = "Months",
+       y = "Average temperature (\u00B0C)",
+       fill = "Time period") +
+  geom_text(aes(label = round(average_temp/10, digits = 1), y = (average_temp/10)-0.4, fill = as.factor(group), x = as.factor(month)), colour = "white", size = 4) +
+  theme_minimal()
+  
+```
+
+```{r}
+maanden <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec","")
+
+for (jaar in 2000:2024) {
+#
+weather_df %>%
+  mutate(cumQdiff = cumQdiff / 100) %>%
+  mutate(cumTGdiff = cumTGdiff / 10) %>% 
+  mutate(cumRHdiff = cumRHdiff / 10) %>% 
+  filter(year == jaar) -> df_year
+
+#Define y-axis limits
+limits = c(df_year$cumTGdiff, c(df_year$cumQdiff, df_year$cumRHdiff))
+
+#Create line plot of temperature difference
+plot(x = df_year$DOY, y = df_year$cumTGdiff, type = "l", ylim = c(min(limits), max(limits)), main = jaar, xaxt = "n", xlab = "month", ylab = "cumulative difference with average year" )
+axis(1, at = seq(1,365, by = 30), labels = maanden)
+abline(h = 0)
+
+#Add line of radiation
+lines(df_year$DOY, y = df_year$cumQdiff, type = "l", col = "red")
+
+#Add line of precipitation
+lines(df_year$DOY, y = df_year$cumRHdiff, type = "l", col = "blue")
+
+# Add legend
+legend("topleft", 
+       legend = c("Temperature (\u00B0C)", "Radiation (0.1 J/cm2)", "Precipitation (mm)"), 
+       col = c("black", "red", "blue"), 
+       lty = 1, 
+       cex = 0.8)
+}
+
+```
+```{r}
+#Showing two week interval of weather
+weather_df %>% 
+  filter(date >= as.Date(Sys.time())-7) -> current_df
+
+plot(x = current_df$date, y = current_df$TG, type = "l", ylim = c(0,250), lwd = 3)
+abline(v = as.Date(Sys.time()))
+
+lines(x = current_df$date, y = current_df$Q/10, type = "l", col = "red", lwd = 3)
+
+lines(x = current_df$date, y = current_df$RH, type = "l", col = "blue", lwd = 3)
+
+axis.Date(1, at = current_df$date)
+```
+```{r}
+#Average temperature per month
+df_year %>% 
+  group_by(month) %>% 
+  summarise(avg_temp = round(mean(TG)/10,digits = 1))
+
+months <- c(rep(1,31), rep(2,28),rep(3,31),rep(4,30),rep(5,31),rep(6,30), rep(7,31), rep(8,31), rep(9,30), rep(10,31), rep(11,30), rep(12,32))
+
+
+```
+
